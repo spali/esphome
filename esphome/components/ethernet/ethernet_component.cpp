@@ -57,7 +57,13 @@ void EthernetComponent::setup() {
     .intr_flags = 0,
   };
 
-  err = spi_bus_initialize(SPI3_HOST, &buscfg, SPI_DMA_CH_AUTO);
+#if defined(USE_ESP32_VARIANT_ESP32C3) || defined(USE_ESP32_VARIANT_ESP32S2) || defined(USE_ESP32_VARIANT_ESP32S3)
+  auto host = SPI2_HOST;
+#else
+  auto host = SPI3_HOST;
+#endif
+
+  err = spi_bus_initialize(host, &buscfg, SPI_DMA_CH_AUTO);
   ESPHL_ERROR_CHECK(err, "SPI bus initialize error");
   // TODO: END SPI GLOBAL
 #endif
@@ -93,7 +99,7 @@ void EthernetComponent::setup() {
   };
 
   spi_device_handle_t spi_handle = nullptr;
-  err = spi_bus_add_device(SPI3_HOST, &devcfg, &spi_handle);
+  err = spi_bus_add_device(host, &devcfg, &spi_handle);
   ESPHL_ERROR_CHECK(err, "SPI bus add device error");
 
   eth_w5500_config_t w5500_config = ETH_W5500_DEFAULT_CONFIG(spi_handle);
