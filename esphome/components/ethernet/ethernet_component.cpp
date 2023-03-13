@@ -119,6 +119,7 @@ void EthernetComponent::setup() {
   esp_eth_mac_t *mac;
   esp_eth_phy_t *phy;
   switch (this->type_) {
+#if CONFIG_ETH_USE_ESP32_EMAC
     case ETHERNET_TYPE_LAN8720: {
       mac = esp_eth_mac_new_esp32(&mac_config);
       phy = esp_eth_phy_new_lan87xx(&phy_config);
@@ -144,6 +145,7 @@ void EthernetComponent::setup() {
       phy = esp_eth_phy_new_jl1101(&phy_config);
       break;
     }
+#endif
 #ifdef USE_ETHERNET_SPI  // Configure SPI interface and Ethernet driver for specific SPI module
     case ETHERNET_TYPE_W5500: {
       mac = esp_eth_mac_new_w5500(&w5500_config, &mac_config);
