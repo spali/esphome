@@ -4,6 +4,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/network/ip_address.h"
+#include "esphome/components/spi/spi.h"
 
 #ifdef USE_ESP32
 
@@ -37,7 +38,9 @@ enum class EthernetComponentState {
   CONNECTED,
 };
 
-class EthernetComponent : public Component {
+class EthernetComponent : public Component,
+                          public spi::SPIDevice<spi::BIT_ORDER_LSB_FIRST, spi::CLOCK_POLARITY_LOW,
+                                                spi::CLOCK_PHASE_LEADING, spi::DATA_RATE_20MHZ> {
  public:
   EthernetComponent();
   void setup() override;
@@ -49,10 +52,6 @@ class EthernetComponent : public Component {
 
   // TODO: not defined here (due ethernet_component.h is imported before define.h) ???
 #ifdef USE_ETHERNET_SPI
-  void set_clk_pin(uint8_t clk_pin);
-  void set_miso_pin(uint8_t miso_pin);
-  void set_mosi_pin(uint8_t mosi_pin);
-  void set_cs_pin(uint8_t cs_pin);
   void set_interrupt_pin(uint8_t interrupt_pin);
   void set_reset_pin(uint8_t reset_pin);
   void set_clock_speed(uint8_t clock_speed);
@@ -80,10 +79,7 @@ class EthernetComponent : public Component {
 
   // TODO: not defined here (due ethernet_component.h is imported before define.h) ???
 #ifdef USE_ETHERNET_SPI
-  uint8_t clk_pin_;
-  uint8_t miso_pin_;
-  uint8_t mosi_pin_;
-  uint8_t cs_pin_;
+  // uint8_t cs_pin_;
   uint8_t interrupt_pin_;
   int reset_pin_{-1};
   int phy_addr_spi_{-1};

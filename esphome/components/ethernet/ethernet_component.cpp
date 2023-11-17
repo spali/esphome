@@ -9,7 +9,6 @@
 #include "esp_event.h"
 
 #ifdef USE_ETHERNET_SPI
-#include <driver/gpio.h>
 #include <driver/spi_master.h>
 #endif
 
@@ -33,41 +32,16 @@ void EthernetComponent::setup() {
   ESP_LOGCONFIG(TAG, "Setting up Ethernet...");
   // Delay here to allow power to stabilise before Ethernet is initialised.
   delay(300);  // NOLINT
-  esp_err_t err;
 
   // TODO: START SPI GLOBAL
 #ifdef USE_ETHERNET_SPI
-  // Install GPIO ISR handler to be able to service SPI Eth modules interrupts
-  gpio_install_isr_service(0);
 
-  spi_bus_config_t buscfg = {
-    .mosi_io_num = this->mosi_pin_,
-    .miso_io_num = this->miso_pin_,
-    .sclk_io_num = this->clk_pin_,
-    .quadwp_io_num = -1,
-    .quadhd_io_num = -1,
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
-    .data4_io_num = -1,
-    .data5_io_num = -1,
-    .data6_io_num = -1,
-    .data7_io_num = -1,
-#endif
-    .max_transfer_sz = 0,
-    .flags = 0,
-    .intr_flags = 0,
-  };
+  // this->spi_setup();
 
-#if defined(USE_ESP32_VARIANT_ESP32C3) || defined(USE_ESP32_VARIANT_ESP32S2) || defined(USE_ESP32_VARIANT_ESP32S3)
-  auto host = SPI2_HOST;
-#else
-  auto host = SPI3_HOST;
-#endif
-
-  err = spi_bus_initialize(host, &buscfg, SPI_DMA_CH_AUTO);
-  ESPHL_ERROR_CHECK(err, "SPI bus initialize error");
   // TODO: END SPI GLOBAL
 #endif
 
+  esp_err_t err;
   err = esp_netif_init();
   ESPHL_ERROR_CHECK(err, "ETH netif init error");
   err = esp_event_loop_create_default();
@@ -91,7 +65,7 @@ void EthernetComponent::setup() {
       .cs_ena_posttrans = 0,
       .clock_speed_hz = this->clock_speed_,
       .input_delay_ns = 0,
-      .spics_io_num = this->cs_pin_,
+      .spics_io_num = ((InternalGPIOPin *) this->cs_)->get_pin(),
       .flags = 0,
       .queue_size = 20,
       .pre_cb = nullptr,
@@ -99,7 +73,7 @@ void EthernetComponent::setup() {
   };
 
   spi_device_handle_t spi_handle = nullptr;
-  err = spi_bus_add_device(host, &devcfg, &spi_handle);
+  err = spi_bus_add_device(this->parent_->host_, &devcfg, &spi_handle);
   ESPHL_ERROR_CHECK(err, "SPI bus add device error");
 
   eth_w5500_config_t w5500_config = ETH_W5500_DEFAULT_CONFIG(spi_handle);
@@ -260,10 +234,7 @@ void EthernetComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Ethernet:");
   this->dump_connect_params_();
 #ifdef USE_ETHERNET_SPI
-  ESP_LOGCONFIG(TAG, "  CLK Pin: %u", this->clk_pin_);
-  ESP_LOGCONFIG(TAG, "  MISO Pin: %u", this->miso_pin_);
-  ESP_LOGCONFIG(TAG, "  MOSI Pin: %u", this->mosi_pin_);
-  ESP_LOGCONFIG(TAG, "  CS Pin: %u", this->cs_pin_);
+  ESP_LOGCONFIG(TAG, "  CS Pin: %u", ((InternalGPIOPin *) this->cs_)->get_pin());
   ESP_LOGCONFIG(TAG, "  IRQ Pin: %u", this->interrupt_pin_);
   ESP_LOGCONFIG(TAG, "  Reset Pin: %d", this->reset_pin_);
   ESP_LOGCONFIG(TAG, "  Clock Speed: %d MHz", this->clock_speed_ / 1000000);
@@ -415,10 +386,6 @@ void EthernetComponent::dump_connect_params_() {
 }
 
 #ifdef USE_ETHERNET_SPI
-void EthernetComponent::set_clk_pin(uint8_t clk_pin) { this->clk_pin_ = clk_pin; }
-void EthernetComponent::set_miso_pin(uint8_t miso_pin) { this->miso_pin_ = miso_pin; }
-void EthernetComponent::set_mosi_pin(uint8_t mosi_pin) { this->mosi_pin_ = mosi_pin; }
-void EthernetComponent::set_cs_pin(uint8_t cs_pin) { this->cs_pin_ = cs_pin; }
 void EthernetComponent::set_interrupt_pin(uint8_t interrupt_pin) { this->interrupt_pin_ = interrupt_pin; }
 void EthernetComponent::set_reset_pin(uint8_t reset_pin) { this->reset_pin_ = reset_pin; }
 void EthernetComponent::set_clock_speed(uint8_t clock_speed) { this->clock_speed_ = clock_speed * 1000000; }

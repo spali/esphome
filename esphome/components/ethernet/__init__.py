@@ -2,6 +2,7 @@ from esphome import pins
 import esphome.config_validation as cv
 import esphome.codegen as cg
 from esphome.components.esp32 import add_idf_sdkconfig_option
+from esphome.components import spi
 from esphome.const import (
     CONF_DOMAIN,
     CONF_ID,
@@ -79,7 +80,7 @@ MANUAL_IP_SCHEMA = cv.Schema(
     }
 )
 
-EthernetComponent = ethernet_ns.class_("EthernetComponent", cg.Component)
+EthernetComponent = ethernet_ns.class_("EthernetComponent", cg.Component, spi.SPIDevice)
 ManualIP = ethernet_ns.struct("ManualIP")
 
 
@@ -92,18 +93,19 @@ def _validate(config):
         config[CONF_USE_ADDRESS] = use_address
     return config
 
+
 BASE_SCHEMA = cv.Schema(
-        {
-            cv.GenerateID(): cv.declare_id(EthernetComponent),
-            cv.Optional(CONF_MANUAL_IP): MANUAL_IP_SCHEMA,
-            cv.Optional(CONF_DOMAIN, default=".local"): cv.domain_name,
-            cv.Optional(CONF_USE_ADDRESS): cv.string_strict,
-            cv.Optional("enable_mdns"): cv.invalid(
-                "This option has been removed. Please use the [disabled] option under the "
-                "new mdns component instead."
-            ),
-        }
-    ).extend(cv.COMPONENT_SCHEMA)
+    {
+        cv.GenerateID(): cv.declare_id(EthernetComponent),
+        cv.Optional(CONF_MANUAL_IP): MANUAL_IP_SCHEMA,
+        cv.Optional(CONF_DOMAIN, default=".local"): cv.domain_name,
+        cv.Optional(CONF_USE_ADDRESS): cv.string_strict,
+        cv.Optional("enable_mdns"): cv.invalid(
+            "This option has been removed. Please use the [disabled] option under the "
+            "new mdns component instead."
+        ),
+    }
+).extend(cv.COMPONENT_SCHEMA)
 
 RMII_SCHEMA = BASE_SCHEMA.extend(
     cv.Schema(
@@ -121,13 +123,13 @@ RMII_SCHEMA = BASE_SCHEMA.extend(
 
 # TODO: esp-idf only
 # TODO: require SPI
-SPI_SCHEMA = BASE_SCHEMA.extend(
+SPI_SCHEMA = BASE_SCHEMA.extend(spi.spi_device_schema()).extend(
     cv.Schema(
         {
             cv.Required(CONF_CLK_PIN): pins.internal_gpio_output_pin_number,
             cv.Required(CONF_MISO_PIN): pins.internal_gpio_input_pin_number,
             cv.Required(CONF_MOSI_PIN): pins.internal_gpio_output_pin_number,
-            cv.Required(CONF_CS_PIN): pins.internal_gpio_output_pin_number,
+            # cv.Required(CONF_CS_PIN): pins.internal_gpio_output_pin_number,
             cv.Required(CONF_INTERRUPT_PIN): pins.internal_gpio_input_pin_number,
             # default internally to -1 if not set (means disabled)
             cv.Optional(CONF_RESET_PIN): pins.internal_gpio_output_pin_number,
@@ -171,15 +173,13 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     if config[CONF_TYPE] == "W5500":
-        cg.add(var.set_clk_pin(config[CONF_CLK_PIN]))
-        cg.add(var.set_miso_pin(config[CONF_MISO_PIN]))
-        cg.add(var.set_mosi_pin(config[CONF_MOSI_PIN]))
-        cg.add(var.set_cs_pin(config[CONF_CS_PIN]))
+
+        await spi.register_spi_device(var, config)
         cg.add(var.set_interrupt_pin(config[CONF_INTERRUPT_PIN]))
         if CONF_RESET_PIN in config:
             cg.add(var.set_reset_pin(config[CONF_RESET_PIN]))
         cg.add(var.set_clock_speed(config[CONF_CLOCK_SPEED]))
-        
+
         cg.add_define("USE_ETHERNET_SPI")
         add_idf_sdkconfig_option("CONFIG_ETH_USE_SPI_ETHERNET", True)
         add_idf_sdkconfig_option("CONFIG_ETH_SPI_ETHERNET_W5500", True)

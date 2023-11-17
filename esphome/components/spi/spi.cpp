@@ -8,6 +8,13 @@ namespace spi {
 
 static const char *const TAG = "spi";
 
+#define ESPHL_ERROR_CHECK(err, message) \
+  if ((err) != ESP_OK) { \
+    ESP_LOGE(TAG, message ": (%d) %s", err, esp_err_to_name(err)); \
+    this->mark_failed(); \
+    return; \
+  }
+
 void IRAM_ATTR HOT SPIComponent::disable() {
 #ifdef USE_SPI_ARDUINO_BACKEND
   if (this->hw_spi_ != nullptr) {
@@ -96,6 +103,36 @@ void SPIComponent::setup() {
     this->mosi_->setup();
     this->mosi_->digital_write(false);
   }
+
+  // Install GPIO ISR handler to be able to service SPI Eth modules interrupts
+  gpio_install_isr_service(0);
+
+  spi_bus_config_t buscfg = {
+    .mosi_io_num = ((InternalGPIOPin *) this->mosi_)->get_pin(),
+    .miso_io_num = ((InternalGPIOPin *) this->miso_)->get_pin(),
+    .sclk_io_num = ((InternalGPIOPin *) this->clk_)->get_pin(),
+    .quadwp_io_num = -1,
+    .quadhd_io_num = -1,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
+    .data4_io_num = -1,
+    .data5_io_num = -1,
+    .data6_io_num = -1,
+    .data7_io_num = -1,
+#endif
+    .max_transfer_sz = 0,
+    .flags = 0,
+    .intr_flags = 0,
+  };
+
+#if defined(USE_ESP32_VARIANT_ESP32C3) || defined(USE_ESP32_VARIANT_ESP32S2) || defined(USE_ESP32_VARIANT_ESP32S3)
+  this->host_ = SPI2_HOST;
+#else
+  this->host_ = SPI3_HOST;
+#endif
+
+  esp_err_t err;
+  err = spi_bus_initialize(this->host_, &buscfg, SPI_DMA_CH_AUTO);
+  ESPHL_ERROR_CHECK(err, "SPI bus initialize error");
 }
 void SPIComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "SPI bus:");

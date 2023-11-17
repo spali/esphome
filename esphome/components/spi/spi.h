@@ -4,6 +4,9 @@
 #include "esphome/core/hal.h"
 #include <vector>
 
+#include <driver/spi_master.h>
+#include <driver/gpio.h>
+
 #ifdef USE_ARDUINO
 #define USE_SPI_ARDUINO_BACKEND
 #endif
@@ -249,6 +252,8 @@ class SPIComponent : public Component {
   void disable();
 
   float get_setup_priority() const override;
+
+  spi_host_device_t host_;
 
  protected:
   inline void cycle_clock_(bool value);
